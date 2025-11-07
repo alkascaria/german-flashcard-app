@@ -1,0 +1,122 @@
+.flashcard {
+  width: 300px;
+  height: 200px;
+  perspective: 1000px;
+  margin: 1rem;
+  cursor: pointer;
+}
+
+.flashcard-inner {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  text-align: center;
+  transition: transform 0.6s;
+  transform-style: preserve-3d;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+  border-radius: 10px;
+}
+
+.flashcard.flipped .flashcard-inner {
+  transform: rotateY(180deg);
+}
+
+.flashcard-front,
+.flashcard-back {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  backface-visibility: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding: 1rem;
+  border-radius: 10px;
+}
+
+.flashcard-front {
+  background: white;
+}
+
+.flashcard-back {
+  background: #f8f9fa;
+  transform: rotateY(180deg);
+}
+
+.card-content {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+}
+
+.german-text,
+.english-text {
+  margin: 0;
+  word-break: break-word;
+}
+
+.german-text {
+  font-size: 1.5rem;
+  color: #2c3e50;
+}
+
+.english-text {
+  font-size: 1.3rem;
+  color: #34495e;
+}
+
+.examples {
+  font-size: 0.9rem;
+  color: #666;
+  font-style: italic;
+}
+
+.card-actions {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  display: flex;
+  gap: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+
+.flashcard:hover .card-actions {
+  opacity: 1;
+}
+
+.edit-btn,
+.delete-btn {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.3s;
+}
+
+.edit-btn {
+  background: #2196f3;
+  color: white;
+}
+
+.delete-btn {
+  background: #ff5252;
+  color: white;
+}
+
+.edit-btn:hover {
+  background: #1976d2;
+}
+
+.delete-btn:hover {
+  background: #d32f2f;
+}
