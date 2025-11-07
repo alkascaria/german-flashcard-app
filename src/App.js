@@ -1,157 +1,43 @@
-// App.js - Updated with gender support
 import PropTypes from 'prop-types';
 import { useEffect, useState } from 'react';
 import { flashcardApi } from './api/flashcardApi';
 import './App.css';
+import AddCardForm from './components/AddCardForm';
 import Flashcard from './components/Flashcard';
-
-const AddCardForm = ({ newCard, onSubmit, onCancel, onChange, editMode }) => {
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    // Validate required fields
-    if (!newCard.german?.trim() || !newCard.english?.trim()) {
-      alert('German and English texts are required');
-      return;
-    }
-    
-    // Pass the card data to onSubmit
-    onSubmit(newCard);
-  };
-
-  return (
-    <div className="modal">
-      <div className="modal-content">
-        <h2>{editMode ? 'Edit Card' : 'Add New Card'}</h2>
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="german">German Text*</label>
-            <input
-              id="german"
-              name="german"
-              value={newCard.german}
-              onChange={onChange}
-              placeholder="Enter German text"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="english">English Text*</label>
-            <input
-              id="english"
-              name="english"
-              value={newCard.english}
-              onChange={onChange}
-              placeholder="Enter English text"
-              required
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="category">Category</label>
-            <input
-              id="category"
-              name="category"
-              value={newCard.category}
-              onChange={onChange}
-              placeholder="Enter category"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="difficulty">Difficulty</label>
-            <select
-              id="difficulty"
-              name="difficulty"
-              value={newCard.difficulty}
-              onChange={onChange}
-            >
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="examples">Examples</label>
-            <textarea
-              id="examples"
-              name="examples"
-              value={newCard.examples}
-              onChange={onChange}
-              placeholder="Enter example sentences"
-            />
-          </div>
-
-          <div className="form-buttons">
-            <button type="submit" className="btn btn-save">
-              {editMode ? 'Save Changes' : 'Add Card'}
-            </button>
-            <button 
-              type="button" 
-              className="btn btn-cancel"
-              onClick={onCancel}
-            >
-              Cancel
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-// Add QuizCard component
-const QuizCard = ({ card, onSubmit }) => {
-  const [answer, setAnswer] = useState('');
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSubmit(answer);
-    setAnswer('');
-  };
-
-  return (
-    <div className="quiz-card">
-      <h3 className="german-text">{card.german}</h3>
-      <form onSubmit={handleSubmit}>
-        <div className="quiz-input-group">
-          <input
-            type="text"
-            value={answer}
-            onChange={(e) => setAnswer(e.target.value)}
-            placeholder="Type English translation..."
-            autoFocus
-          />
-          <button type="submit" className="quiz-submit-btn">
-            Check
-          </button>
-        </div>
-      </form>
-    </div>
-  );
-};
-
-QuizCard.propTypes = {
-  card: PropTypes.shape({
-    german: PropTypes.string.isRequired,
-    english: PropTypes.string.isRequired
-  }).isRequired,
-  onSubmit: PropTypes.func.isRequired
-};
+import QuizCard from './components/QuizCard';
 
 function App() {
-  // State variables
-  const [flashcards, setFlashcards] = useState([]);
-  const [currentCardIndex, setCurrentCardIndex] = useState(0);
-  const [showAnswer, setShowAnswer] = useState(false);
-  const [showDetails, setShowDetails] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [cardState, setCardState] = useState({
+    flashcards: [],
+    filteredCards: [],
+    currentCardIndex: 0,
+    categories: []
+  });
+
+  const [uiState, setUiState] = useState({
+    showAnswer: false,
+    showDetails: false,
+    showAddCard: false,
+    showGrid: false,
+    showExportModal: false,
+    showImportModal: false,
+    editMode: false
+  });
+
+  const [studyState, setStudyState] = useState({
+    mode: 'normal',
+    quizScore: { correct: 0, incorrect: 0 },
+    quizFeedback: null,
+    spacedQueue: []
+  });
+
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState({ api: null, db: null, ui: null });
-  const [newCard, setNewCard] = useState({ 
-    german: '', 
-    english: '', 
+
+  // New state for form inputs
+  const [newCard, setNewCard] = useState({
+    german: '',
+    english: '',
     category: 'Uncategorized',
     difficulty: 'medium',
     examples: '',
@@ -161,35 +47,22 @@ function App() {
     wordType: 'phrase',
     gender: null
   });
-  const [showAddCard, setShowAddCard] = useState(false);
-  const [categories, setCategories] = useState([]);
+
   const [selectedCategory, setSelectedCategory] = useState('All');
-  const [studyMode, setStudyMode] = useState('normal'); // 'normal' or 'spaced'
   const [selectedDifficulty, setSelectedDifficulty] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [quizScore, setQuizScore] = useState({ correct: 0, incorrect: 0 });
-  const [showExportModal, setShowExportModal] = useState(false);
-  const [importText, setImportText] = useState('');
-  const [showImportModal, setShowImportModal] = useState(false);
-  const [editMode, setEditMode] = useState(false);
-  const [filteredCards, setFilteredCards] = useState([]);
-  const [showGrid, setShowGrid] = useState(false); // New state for grid view
-  const [quizAnswer, setQuizAnswer] = useState('');
-  const [quizFeedback, setQuizFeedback] = useState(null);
-  const [showQuizInput, setShowQuizInput] = useState(false);
-  const [lastReviewedCards, setLastReviewedCards] = useState([]);
-  const [spacedQueue, setSpacedQueue] = useState([]);
 
   // Fetch all flashcards
   const fetchFlashcards = async () => {
     try {
       setIsLoading(true);
       const cards = await flashcardApi.getFlashcards();
-      setFlashcards(cards);
-      
-      // Extract unique categories
-      const uniqueCategories = [...new Set(cards.map(card => card.category))];
-      setCategories(uniqueCategories);
+      setCardState(prev => ({ 
+        ...prev, 
+        flashcards: cards,
+        filteredCards: cards,
+        categories: [...new Set(cards.map(card => card.category))]
+      }));
       setError(prev => ({ ...prev, api: null }));
     } catch (error) {
       console.error('Failed to fetch cards:', error);
@@ -210,17 +83,17 @@ function App() {
 
   // Save flashcards to localStorage whenever they change
   useEffect(() => {
-    // saveFlashcards(flashcards);
-  }, [flashcards]);
+    // saveFlashcards(cardState.flashcards);
+  }, [cardState.flashcards]);
 
   // Filter cards based on selected category, difficulty, and search term
   useEffect(() => {
-    if (flashcards.length === 0) {
-      setFilteredCards([]);
+    if (cardState.flashcards.length === 0) {
+      setCardState(prev => ({ ...prev, filteredCards: [] }));
       return;
     }
 
-    let filtered = [...flashcards];
+    let filtered = [...cardState.flashcards];
     
     // Filter by category
     if (selectedCategory !== 'All') {
@@ -244,17 +117,22 @@ function App() {
       );
     }
     
-    // Apply study mode filters
-    if (studyMode === 'spaced') {
-      // Sort for spaced repetition mode
+    // Update studyMode reference
+    if (studyState.mode === 'spaced') {
       filtered = sortCardsForSpacedRepetition(filtered);
     }
     
-    setFilteredCards(filtered);
-    setCurrentCardIndex(0);
-    setShowAnswer(false);
-    setShowDetails(false);
-  }, [selectedCategory, selectedDifficulty, searchTerm, flashcards, studyMode]);
+    setCardState(prev => ({ 
+      ...prev, 
+      filteredCards: filtered,
+      currentCardIndex: 0
+    }));
+    setUiState(prev => ({ 
+      ...prev, 
+      showAnswer: false,
+      showDetails: false
+    }));
+  }, [selectedCategory, selectedDifficulty, searchTerm, cardState.flashcards, studyState.mode]);
 
   // Function to sort cards for spaced repetition
   const sortCardsForSpacedRepetition = (cards) => {
@@ -282,40 +160,52 @@ function App() {
 
   // Function to flip the card
   const handleFlip = () => {
-    setShowAnswer(!showAnswer);
+    setUiState(prev => ({ ...prev, showAnswer: !prev.showAnswer }));
   };
 
   // Function to toggle details
   const handleToggleDetails = () => {
-    setShowDetails(!showDetails);
+    setUiState(prev => ({ ...prev, showDetails: !prev.showDetails }));
   };
 
   // Functions to navigate cards
   const handleNext = () => {
-    if (filteredCards.length > 0) {
+    if (cardState.filteredCards.length > 0) {
       // Update card review data in spaced repetition mode
-      if (studyMode === 'spaced' && showAnswer) {
+      if (studyState.mode === 'spaced' && uiState.showAnswer) {
         updateCardReview();
       }
       
-      setCurrentCardIndex((currentCardIndex + 1) % filteredCards.length);
-      setShowAnswer(false);
-      setShowDetails(false);
+      setCardState(prev => ({ 
+        ...prev, 
+        currentCardIndex: (prev.currentCardIndex + 1) % prev.filteredCards.length 
+      }));
+      setUiState(prev => ({ 
+        ...prev, 
+        showAnswer: false,
+        showDetails: false
+      }));
     }
   };
 
   const handlePrevious = () => {
-    if (filteredCards.length > 0) {
-      setCurrentCardIndex((currentCardIndex - 1 + filteredCards.length) % filteredCards.length);
-      setShowAnswer(false);
-      setShowDetails(false);
+    if (cardState.filteredCards.length > 0) {
+      setCardState(prev => ({ 
+        ...prev, 
+        currentCardIndex: (prev.currentCardIndex - 1 + prev.filteredCards.length) % prev.filteredCards.length 
+      }));
+      setUiState(prev => ({ 
+        ...prev, 
+        showAnswer: false,
+        showDetails: false
+      }));
     }
   };
 
   // Update card review info for spaced repetition
   const updateCardReview = () => {
-    const currentCard = filteredCards[currentCardIndex];
-    const updatedCards = flashcards.map(card => {
+    const currentCard = cardState.filteredCards[cardState.currentCardIndex];
+    const updatedCards = cardState.flashcards.map(card => {
       if (card._id === currentCard._id) {
         return {
           ...card,
@@ -326,17 +216,17 @@ function App() {
       return card;
     });
     
-    setFlashcards(updatedCards);
+    setCardState(prev => ({ ...prev, flashcards: updatedCards }));
   };
 
   // Function to handle difficulty rating
   const handleRateDifficulty = async (cardId, difficulty) => {
     try {
       setIsLoading(true);
-      const cardToUpdate = flashcards.find(card => card._id === cardId);
+      const cardToUpdate = cardState.flashcards.find(card => card._id === cardId);
       const updatedCard = { ...cardToUpdate, difficulty };
       await flashcardApi.updateFlashcard(cardId, updatedCard);
-      setFlashcards(current => 
+      setCardState(current => 
         current.map(card => card._id === cardId ? updatedCard : card)
       );
     } catch (error) {
@@ -349,26 +239,26 @@ function App() {
 
   // Quiz mode functions
   const handleQuizAnswer = (answer) => {
-    const currentCard = filteredCards[currentCardIndex];
+    const currentCard = cardState.filteredCards[cardState.currentCardIndex];
     const isCorrect = answer.toLowerCase().trim() === currentCard.english.toLowerCase().trim();
     
-    setQuizFeedback({
-      correct: isCorrect,
-      message: isCorrect 
-        ? 'Correct! 🎉' 
-        : `Incorrect. The correct answer is: ${currentCard.english}`
-    });
-    
-    // Update score
-    setQuizScore(prev => ({
+    setStudyState(prev => ({
       ...prev,
-      correct: prev.correct + (isCorrect ? 1 : 0),
-      incorrect: prev.incorrect + (isCorrect ? 0 : 1)
+      quizFeedback: {
+        correct: isCorrect,
+        message: isCorrect 
+          ? 'Correct! 🎉' 
+          : `Incorrect. The correct answer is: ${currentCard.english}`
+      },
+      quizScore: {
+        correct: prev.quizScore.correct + (isCorrect ? 1 : 0),
+        incorrect: prev.quizScore.incorrect + (isCorrect ? 0 : 1)
+      }
     }));
     
     // Show feedback for 2 seconds before moving to next card
     setTimeout(() => {
-      setQuizFeedback(null);
+      setStudyState(prev => ({ ...prev, quizFeedback: null }));
       handleNext();
     }, 2000);
   };
@@ -408,8 +298,12 @@ function App() {
       const addedCard = await response.json();
       console.log('Card added successfully:', addedCard);
 
-      setFlashcards(current => [addedCard, ...current]);
-      setShowAddCard(false);
+      setCardState(current => ({ 
+        ...current, 
+        flashcards: [addedCard, ...current.flashcards],
+        filteredCards: [addedCard, ...current.filteredCards]
+      }));
+      setUiState(prev => ({ ...prev, showAddCard: false }));
       setNewCard({
         german: '',
         english: '',
@@ -425,14 +319,18 @@ function App() {
       setError({ api: null, db: null, ui: null }); // Update to set full error object
     } catch (error) {
       console.error('Error adding card:', error);
-      setError({ 
-        api: `Failed to add flashcard: ${error.message}`,
-        db: null,
-        ui: null
-      });
+      setError(handleApiError(error, 'add flashcard'));
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const validateCard = (card) => {
+    const errors = [];
+    if (!card.german?.trim()) errors.push('German text is required');
+    if (!card.english?.trim()) errors.push('English text is required');
+    if (card.wordType === 'noun' && !card.gender) errors.push('Gender is required for nouns');
+    return errors;
   };
 
   // Function to handle changes in the add card form inputs
@@ -457,13 +355,16 @@ function App() {
       setIsLoading(true);
       await flashcardApi.deleteFlashcard(id);
       
-      setFlashcards(currentCards => 
+      setCardState(currentCards => 
         currentCards.filter(card => card._id !== id)
       );
       
       // Reset current card index if necessary
-      if (currentCardIndex >= filteredCards.length - 1) {
-        setCurrentCardIndex(Math.max(0, filteredCards.length - 2));
+      if (cardState.currentCardIndex >= cardState.filteredCards.length - 1) {
+        setCardState(prev => ({ 
+          ...prev, 
+          currentCardIndex: Math.max(0, prev.filteredCards.length - 2) 
+        }));
       }
       
       setError(prev => ({ ...prev, api: null }));
@@ -478,8 +379,7 @@ function App() {
   // Function to edit the current card
   const handleEditCard = (card) => {
     setNewCard(card);
-    setEditMode(true);
-    setShowAddCard(true);
+    setUiState(prev => ({ ...prev, editMode: true, showAddCard: true }));
   };
 
   // Function to save edited card
@@ -487,11 +387,10 @@ function App() {
     try {
       setIsLoading(true);
       const updatedCard = await flashcardApi.updateFlashcard(newCard._id, newCard);
-      setFlashcards(current => 
+      setCardState(current => 
         current.map(card => card._id === newCard._id ? updatedCard : card)
       );
-      setShowAddCard(false);
-      setEditMode(false);
+      setUiState(prev => ({ ...prev, showAddCard: false, editMode: false }));
       setError(null);
     } catch (error) {
       console.error('Failed to update card:', error);
@@ -503,29 +402,32 @@ function App() {
 
   // Reset quiz score
   const resetQuiz = () => {
-    setQuizScore({ correct: 0, incorrect: 0 });
-    setQuizFeedback(null);
-    setShowQuizInput(false);
-    setCurrentCardIndex(0);
+    setStudyState(prev => ({ 
+      ...prev, 
+      quizScore: { correct: 0, incorrect: 0 },
+      quizFeedback: null
+    }));
+    setUiState(prev => ({ ...prev, showQuizInput: false }));
+    setCardState(prev => ({ ...prev, currentCardIndex: 0 }));
   };
 
   // Refresh function
   const handleRefresh = () => {
     fetchFlashcards();
     resetQuiz();
-    setCurrentCardIndex(0);
-    setShowAnswer(false);
-    setShowDetails(false);
+    setCardState(prev => ({ ...prev, currentCardIndex: 0 }));
+    setUiState(prev => ({ ...prev, showAnswer: false, showDetails: false }));
   };
 
   // Toggle grid view
   const toggleGridView = () => {
-    setShowGrid(!showGrid);
+    setUiState(prev => ({ ...prev, showGrid: !prev.showGrid }));
   };
 
   // Add this useEffect for keyboard controls
   useEffect(() => {
     const handleKeyPress = (e) => {
+      if (uiState.showAddCard || isLoading) return;
       if (e.key === 'ArrowRight') handleNext();
       if (e.key === 'ArrowLeft') handlePrevious();
       if (e.key === ' ') {
@@ -536,13 +438,13 @@ function App() {
 
     document.addEventListener('keydown', handleKeyPress);
     return () => document.removeEventListener('keydown', handleKeyPress);
-  }, [currentCardIndex, filteredCards.length]); // Updated dependencies
+  }, [cardState.currentCardIndex, cardState.filteredCards.length, uiState.showAddCard, isLoading]);
 
   // Add these handler functions
   const handleCardReview = async (cardId, remembered) => {
     try {
       setIsLoading(true);
-      const cardToUpdate = flashcards.find(card => card._id === cardId);
+      const cardToUpdate = cardState.flashcards.find(card => card._id === cardId);
       
       const updatedCard = {
         ...cardToUpdate,
@@ -553,12 +455,15 @@ function App() {
 
       await flashcardApi.updateFlashcard(cardId, updatedCard);
       
-      setFlashcards(current => 
+      setCardState(current => 
         current.map(card => card._id === cardId ? updatedCard : card)
       );
 
-      if (studyMode === 'spaced') {
-        setSpacedQueue(current => current.filter(id => id !== cardId));
+      if (studyState.mode === 'spaced') {
+        setStudyState(prev => ({ 
+          ...prev, 
+          spacedQueue: prev.spacedQueue.filter(id => id !== cardId) 
+        }));
       }
 
       handleNext();
@@ -579,18 +484,32 @@ function App() {
 
   // Add this useEffect for spaced repetition
   useEffect(() => {
-    if (studyMode === 'spaced' && flashcards.length > 0) {
+    if (studyState.mode === 'spaced' && cardState.flashcards.length > 0) {
       const now = new Date();
-      const dueCards = flashcards
+      const dueCards = cardState.flashcards
         .filter(card => {
           const nextReview = card.nextReview ? new Date(card.nextReview) : null;
           return !nextReview || nextReview <= now;
         })
         .map(card => card._id);
       
-      setSpacedQueue(dueCards);
+      setStudyState(prev => ({ ...prev, spacedQueue: dueCards }));
     }
-  }, [studyMode, flashcards]);
+  }, [studyState.mode, cardState.flashcards]);
+
+  // Create a generic async handler
+  const createAsyncHandler = (operation, successCallback) => async (...args) => {
+    try {
+      setIsLoading(true);
+      const result = await operation(...args);
+      successCallback(result);
+      setError(null);
+    } catch (error) {
+      setError(handleApiError(error, operation.name));
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Update the return statement to include loading and error states
   return (
@@ -598,29 +517,33 @@ function App() {
       <div className="controls-container">
         <div className="mode-selector">
           <button 
-            className={`mode-btn ${studyMode === 'normal' ? 'active' : ''}`}
-            onClick={() => setStudyMode('normal')}
+            className={`mode-btn ${studyState.mode === 'normal' ? 'active' : ''}`}
+            onClick={() => setStudyState(prev => ({ ...prev, mode: 'normal' }))}
           >
             Normal
           </button>
           <button 
-            className={`mode-btn ${studyMode === 'quiz' ? 'active' : ''}`}
+            className={`mode-btn ${studyState.mode === 'quiz' ? 'active' : ''}`}
             onClick={() => {
-              setStudyMode('quiz');
-              resetQuiz();
+              setStudyState(prev => ({ 
+                ...prev, 
+                mode: 'quiz',
+                quizScore: { correct: 0, incorrect: 0 },
+                quizFeedback: null
+              }));
             }}
           >
             Quiz
           </button>
           <button 
-            className={`mode-btn ${studyMode === 'spaced' ? 'active' : ''}`}
-            onClick={() => setStudyMode('spaced')}
+            className={`mode-btn ${studyState.mode === 'spaced' ? 'active' : ''}`}
+            onClick={() => setStudyState(prev => ({ ...prev, mode: 'spaced' }))}
           >
             Spaced
           </button>
         </div>
 
-        <button className="add-btn" onClick={() => setShowAddCard(true)}>
+        <button className="add-btn" onClick={() => setUiState(prev => ({ ...prev, showAddCard: true }))}>
           Add Card
         </button>
       </div>
@@ -631,7 +554,7 @@ function App() {
           onChange={(e) => setSelectedCategory(e.target.value)}
         >
           <option value="All">All Categories</option>
-          {categories.map(cat => (
+          {cardState.categories.map(cat => (
             <option key={cat} value={cat}>{cat}</option>
           ))}
         </select>
@@ -655,47 +578,47 @@ function App() {
       </div>
 
       <div className="flashcards-container">
-        {studyMode === 'quiz' ? (
+        {studyState.mode === 'quiz' ? (
           <div className="quiz-section">
             <div className="quiz-score">
-              <span>Correct: {quizScore.correct}</span>
-              <span>Incorrect: {quizScore.incorrect}</span>
+              <span>Correct: {studyState.quizScore.correct}</span>
+              <span>Incorrect: {studyState.quizScore.incorrect}</span>
             </div>
             
-            {quizFeedback && (
-              <div className={`quiz-feedback ${quizFeedback.correct ? 'correct' : 'incorrect'}`}>
-                {quizFeedback.message}
+            {studyState.quizFeedback && (
+              <div className={`quiz-feedback ${studyState.quizFeedback.correct ? 'correct' : 'incorrect'}`}>
+                {studyState.quizFeedback.message}
               </div>
             )}
 
             <QuizCard
-              card={filteredCards[currentCardIndex]}
+              card={cardState.filteredCards[cardState.currentCardIndex]}
               onSubmit={handleQuizAnswer}
             />
           </div>
-        ) : studyMode === 'spaced' ? (
-          spacedQueue.length === 0 ? (
+        ) : studyState.mode === 'spaced' ? (
+          studyState.spacedQueue.length === 0 ? (
             <div className="no-cards">No cards due for review! 🎉</div>
           ) : (
             <div className="spaced-review">
               <Flashcard
-                {...filteredCards[currentCardIndex]}
+                {...cardState.filteredCards[cardState.currentCardIndex]}
                 onDelete={handleDelete}
                 onEdit={handleEditCard}
               />
               <div className="review-buttons">
-                <button onClick={() => handleCardReview(filteredCards[currentCardIndex]._id, false)}>
+                <button onClick={() => handleCardReview(cardState.filteredCards[cardState.currentCardIndex]._id, false)}>
                   Didn't Remember
                 </button>
-                <button onClick={() => handleCardReview(filteredCards[currentCardIndex]._id, true)}>
+                <button onClick={() => handleCardReview(cardState.filteredCards[cardState.currentCardIndex]._id, true)}>
                   Remembered
                 </button>
               </div>
             </div>
           )
         ) : (
-          <div className={`normal-view ${showGrid ? 'grid' : 'single'}`}>
-            {filteredCards.map(card => (
+          <div className={`normal-view ${uiState.showGrid ? 'grid' : 'single'}`}>
+            {cardState.filteredCards.map(card => (
               <Flashcard
                 key={card._id}
                 {...card}
@@ -707,13 +630,12 @@ function App() {
         )}
       </div>
 
-      {showAddCard && (
+      {uiState.showAddCard && (
         <AddCardForm
           newCard={newCard}
-          onSubmit={editMode ? handleSaveEdit : handleAddCard}
+          onSubmit={uiState.editMode ? handleSaveEdit : handleAddCard}
           onCancel={() => {
-            setShowAddCard(false);
-            setEditMode(false);
+            setUiState(prev => ({ ...prev, showAddCard: false, editMode: false }));
             setNewCard({
               german: '',
               english: '',
@@ -728,7 +650,7 @@ function App() {
             });
           }}
           onChange={handleInputChange}
-          editMode={editMode}
+          editMode={uiState.editMode}
         />
       )}
 
@@ -739,29 +661,40 @@ function App() {
           {error.ui && <div className="error-message ui-error">{error.ui}</div>}
         </div>
       )}
+
+      {isLoading && (
+        <div className="loading-overlay">
+          <div className="loading-spinner"></div>
+        </div>
+      )}
     </div>
   );
 }
 
-App.propTypes = {
-  initialFlashcards: PropTypes.arrayOf(
-    PropTypes.shape({
-      _id: PropTypes.string.isRequired,
-      german: PropTypes.string.isRequired,
-      english: PropTypes.string.isRequired,
-      category: PropTypes.string,
-      difficulty: PropTypes.oneOf(['easy', 'medium', 'hard']),
-      examples: PropTypes.string,
-      notes: PropTypes.string,
-      lastReviewed: PropTypes.number, // Changed from Date
-      timesReviewed: PropTypes.number,
-      wordType: PropTypes.oneOf(['noun', 'verb', 'adjective', 'phrase']),
-      gender: PropTypes.oneOf(['der', 'die', 'das', null])
-    })
-  ),
-  onDelete: PropTypes.func,
-  onEdit: PropTypes.func,
-  onUpdate: PropTypes.func
+// Add this utility function
+const handleApiError = (error, operation) => {
+  console.error(`Failed to ${operation}:`, error);
+  return {
+    api: `Failed to ${operation}: ${error.message}`,
+    db: null,
+    ui: null
+  };
+};
+
+AddCardForm.propTypes = {
+  newCard: PropTypes.shape({
+    german: PropTypes.string.isRequired,
+    english: PropTypes.string.isRequired,
+    category: PropTypes.string,
+    difficulty: PropTypes.string,
+    examples: PropTypes.string,
+    wordType: PropTypes.string,
+    gender: PropTypes.string
+  }).isRequired,
+  onSubmit: PropTypes.func.isRequired,
+  onCancel: PropTypes.func.isRequired,
+  onChange: PropTypes.func.isRequired,
+  editMode: PropTypes.bool.isRequired
 };
 
 export default App;
